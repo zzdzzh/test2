@@ -60,6 +60,8 @@
     "h5": {
         "devServer": {
             "port": 8081,
+            "disableHostCheck": true,
+            "allowedHosts": ["all"],
             "proxy": {
                 "/dev-api": {
                     "target": "http://127.0.0.1:8080",
@@ -73,6 +75,13 @@
                     "changeOrigin": true
                     
                 }
+            }
+        },
+        "router": {
+            "base": "/",
+            "mode": "history",
+            "alias": {
+                "/MP_verify_I1dKULIeyWTC7qE1.txt": "/pages/verify/index"
             }
         }
     }

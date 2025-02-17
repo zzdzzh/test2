@@ -11,6 +11,42 @@
 			"navigationBarBackgroundColor": "#4e6ef2",
 			"navigationBarTextStyle": "white"
 		}
+	}, {
+		"path": "pages/customer-service/list",
+		"style": {
+			"navigationBarTitleText": "客服工单列表",
+			"navigationBarBackgroundColor": "#4e6ef2",
+			"navigationBarTextStyle": "white"
+		}
+	}, {
+		"path": "pages/customer-service/chat",
+		"style": {
+			"navigationBarTitleText": "智能客服",
+			"navigationBarBackgroundColor": "#4e6ef2",
+			"navigationBarTextStyle": "white"
+		}
+	}, {
+		"path": "pages/customer-service/form",
+		"style": {
+			"navigationBarTitleText": "客服工单",
+			"navigationBarBackgroundColor": "#4e6ef2",
+			"navigationBarTextStyle": "white"
+		}
+	}, {
+		"path": "pages/customer-service/agent",
+		"style": {
+			"navigationBarTitleText": "客服工作台",
+			"navigationBarBackgroundColor": "#4e6ef2",
+			"navigationBarTextStyle": "white",
+			"navigationStyle": "custom"
+		}
+	}, {
+		"path": "pages/verify/index",
+		"style": {
+			"navigationStyle": "custom",
+			"navigationBarTitleText": "",
+			"enablePullDownRefresh": false
+		}
 	}],
 	"globalStyle": {
 		"navigationBarTextStyle": "black",
