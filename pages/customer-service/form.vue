@@ -214,7 +214,7 @@
       async processResponse(responseText) {
         try {
           if (!responseText) {
-            return '抱歉，服务器返回为空';
+            return '抱歉，服务器返回为空。';
           }
 
           // 尝试直接解析JSON
