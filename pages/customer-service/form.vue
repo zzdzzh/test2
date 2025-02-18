@@ -569,165 +569,136 @@
   <style>
 
   .chat-container {
-
     display: flex;
-
     flex-direction: column;
-
     height: 100vh;
-
     background-color: #f5f5f5;
-
+    position: relative;
+    box-sizing: border-box;
+    padding-bottom: 80px; /* 对应input-area的高度 */
   }
-
-  
 
   .chat-list {
-
     flex: 1;
-
-    padding: 20rpx;
-
+    padding: 10px;
     overflow-y: auto;
-
+    -webkit-overflow-scrolling: touch; /* 增加iOS滚动惯性 */
+    height: calc(100vh - 80px); /* 减去输入框的高度 */
+    position: relative;
+    z-index: 1; /* 确保滚动区域在输入框之下 */
   }
-
-  
 
   .chat-item {
-
     display: flex;
-
-    margin-bottom: 30rpx;
-
+    margin-bottom: 20px;
     align-items: flex-start;
-
+    max-width: 80%;
   }
-
-  
 
   .chat-item.user {
-
     flex-direction: row-reverse;
-
+    margin-left: auto;
   }
-
-  
 
   .avatar {
-
-    width: 80rpx;
-
-    height: 80rpx;
-
-    margin: 0 20rpx;
-
+    width: 40px;
+    height: 40px;
+    margin: 0 10px;
+    flex-shrink: 0;
   }
-
-  
 
   .avatar image {
-
     width: 100%;
-
     height: 100%;
-
     border-radius: 50%;
-
   }
-
-  
 
   .message {
-
-    max-width: 60%;
-
-    padding: 20rpx;
-
-    border-radius: 10rpx;
-
-    background-color: #fff;
-
-    word-break: break-all;
-
+    background: #fff;
+    padding: 10px 15px;
+    border-radius: 12px;
+    position: relative;
+    word-break: break-word;
   }
 
-  
-
-  .user .message {
-
-    background-color: #007AFF;
-
+  .chat-item.user .message {
+    background: #007AFF;
     color: #fff;
-
   }
-
-  
 
   .time {
-
-    font-size: 24rpx;
-
+    font-size: 12px;
     color: #999;
-
-    margin: 10rpx 20rpx;
-
+    margin: 5px 10px;
   }
-
-  
 
   .input-area {
-
-    padding: 20rpx;
-
-    background-color: #fff;
-
-    border-top: 2rpx solid #eee;
-
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 80px;
+    padding: 8px;
+    background: #fff;
     display: flex;
-
     align-items: center;
-
+    box-sizing: border-box;
+    z-index: 2; /* 确保输入区域在滚动区域之上 */
+    box-shadow: 0 -13px 7px rgb(255, 255, 255);
+    /* 增加安全区域适配 */
+    padding-bottom: calc(8px + constant(safe-area-inset-bottom));
+    padding-bottom: calc(1px + env(safe-area-inset-bottom));
   }
-
-  
 
   .input-box {
-
     flex: 1;
-
-    height: 80rpx;
-
-    padding: 20rpx;
-
-    border: 2rpx solid #eee;
-
-    border-radius: 6rpx;
-
-    margin-right: 20rpx;
-
+    min-height: 35px;
+    max-height: 55px;
+    padding: 8px;
+    margin-right: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+    line-height: 30px;
+    box-sizing: border-box;
+    resize: none;
+    position: relative; /* 确保输入框正确定位 */
   }
-
-  
 
   .send-btn {
-
-    width: 160rpx;
-
-    height: 80rpx;
-
-    line-height: 80rpx;
-
-    text-align: center;
-
-    background-color: #007AFF;
-
+    width: 60px;
+    min-width: 56px; /* 确保按钮不会被压缩 */
+    height: 45px;
+    background: #007AFF;
     color: #fff;
-
-    border-radius: 6rpx;
-
-    font-size: 28rpx;
-
+    border: none;
+    border-radius: 4px;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0; /* 移除内边距 */
+    margin: 0; /* 移除外边距 */
   }
 
+  /* 响应式布局适配 */
+  @media screen and (max-width: 768px) {
+    .chat-container {
+      padding-bottom: 60px;
+    }
+    
+    .chat-list {
+      height: calc(100vh - 60px);
+    }
+  }
+
+  @media screen and (max-width: 480px) {
+    .chat-container {
+      padding-bottom: 55px;
+    }
+    
+    .chat-list {
+      height: calc(100vh - 55px);
+    }
+  }
   </style>
