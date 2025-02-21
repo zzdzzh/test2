@@ -88,20 +88,14 @@
       <view class="input-area">
 
         <textarea v-model="inputMessage" 
-
                   class="input-box" 
-
                   placeholder="请输入您的问题"
-
                   :adjust-position="false"
-
                   :cursor-spacing="20"
-
                   @confirm="sendMessage"
-
                   @keydown.enter.prevent="handleEnterPress" />
-
         <button class="send-btn" @tap="sendMessage">发送</button>
+        <button class="clear-btn" @tap="clearChat">清空</button>
 
       </view>
 
@@ -136,6 +130,7 @@
               phone: '', // 联系电话
               details: '', // 具体事由
             },
+            contactInfoKey: 'user_contact_info', // 用于存储联系信息的key
             isFormComplete: false,
             isConfirmed: false,
             apiConfig: {
@@ -143,8 +138,7 @@
               headers: {
                 'Content-Type': 'application/json'
               },
-              timeout: 30000, // 设置30秒超时
-              maxRetries: 2 // 最大重试次数
+              timeout: 300000, // 设置30秒超时
             },
             systemPrompt: `你是一个智能客服助手，负责分析用户的咨询内容并提取关键信息。
 
@@ -201,6 +195,7 @@
         setTimeout(() => {
             this.getOrderList();
             this.restoreRecentChats();
+            this.restoreContactInfo(); // 恢复用户联系信息
         }, 1000);
     },
 
@@ -323,70 +318,62 @@
       },
 
       async callLLMApi(message, chatHistory) {
-        let retryCount = 0;
-
-        //return("test,mock");
-        while (retryCount <= this.apiConfig.maxRetries) {
-          try {
+        try {
             const token = uni.getStorageSync('token');
             if (!token) {
-              throw new Error('未登录，请先登录');
+                throw new Error('未登录，请先登录');
             }
 
-            // 构建对话内容字符串
-            let contentString = this.systemPrompt + '\n\n对话历史：\n';
-            
-            // 添加历史对话
-            chatHistory.forEach(chat => {
-              contentString += `${chat.type === 'user' ? '用户' : '助手'}: ${chat.content}\n`;
-            });
-            
-            // 添加当前消息
-            contentString += `用户: ${message}`;
+            // 获取localStorage中的联系人信息
+            const contactInfo = uni.getStorageSync(this.contactInfoKey);
+            let contactContext = '';
+            if (contactInfo) {
+                const parsedInfo = JSON.parse(contactInfo);
+                contactContext = `用户的联系方式是：姓名 ${parsedInfo.name}，电话 ${parsedInfo.phone}。`;
+            }
+
+            const messages = [
+                {
+                    role: "system",
+                    content: this.systemPrompt
+                },
+                ...chatHistory,
+                {
+                    role: "user",
+                    content: contactContext + message // 如果有联系人信息就加上，没有就只发送原消息
+                }
+            ];
+
+            const contentString = messages.map((msg, index) => `${msg.role === 'system' ? '系统' : '用户'}: ${msg.content}`).join('\n');
 
             const [err, res] = await uni.request({
-              url: this.apiConfig.url,
-              method: 'POST',
-              header: {
-                ...this.apiConfig.headers,
-                'Authorization': 'Bearer ' + token
-              },
-              data: {
-                content: contentString
-              },
-              timeout: this.apiConfig.timeout // 设置请求超时时间
+                url: this.apiConfig.url,
+                method: 'POST',
+                header: {
+                    ...this.apiConfig.headers,
+                    'Authorization': 'Bearer ' + token
+                },
+                data: {
+                    content: contentString
+                },
+                timeout: this.apiConfig.timeout
             });
 
             if (err) {
-              if (err.errMsg && err.errMsg.includes('timeout')) {
-                if (retryCount < this.apiConfig.maxRetries) {
-                  console.log(`请求超时，第 ${retryCount + 1} 次重试...`);
-                  retryCount++;
-                  continue; // 继续下一次重试
-                }
-              }
-              throw new Error(err.errMsg || '请求失败');
+                throw new Error(err.errMsg || '请求失败');
             }
 
             if (res.statusCode === 200 && res.data.code === 200) {
-              return this.processResponse(res.data.msg);
+                return this.processResponse(res.data.msg);
             } else {
-              throw new Error(res.data.msg || '请求失败');
+                throw new Error(res.data.msg || '请求失败');
             }
-          } catch (error) {
-            if (retryCount < this.apiConfig.maxRetries) {
-              console.log(`请求失败，第 ${retryCount + 1} 次重试...`);
-              retryCount++;
-              // 添加重试延迟，避免立即重试
-              await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount)));
-              continue;
-            }
+        } catch (error) {
             this.saveRecentChats();
             console.error('API调用失败:', error);
             throw error;
-          }
         }
-      },
+    },
 
       async sendMessage() {
         if (!this.inputMessage.trim()) return;
@@ -414,6 +401,7 @@
 
           // 调用API获取响应，传入当前聊天历史
           const response = await this.callLLMApi(userMessage, this.chatList);
+          console.log('API响应：', response);
 
           // 添加系统回复到聊天列表
           this.chatList.push({
@@ -466,128 +454,147 @@
       },
 
       async submitForm() {
-        try {
-          // 检查表单是否完整
-          if (!this.checkFormComplete()) {
+        if (!this.formData.type || !this.formData.name || !this.formData.phone || !this.formData.details) {
             uni.showToast({
-              title: '表单信息不完整',
-              icon: 'error'
+                title: '请填写完整信息',
+                icon: 'none'
             });
             return;
-          }
-
-          uni.showLoading({
+        }
+        
+        // 在提交表单时保存联系信息
+        this.saveContactInfo();
+        
+        uni.showLoading({
             title: '提交中...'
-          });
+        });
 
-          // 构造请求数据
-          const requestData = {
+        // 构造请求数据
+        const requestData = {
             name: this.formData.name,
             phone: this.formData.phone,
             content: this.formData.details,
             consultType: parseInt(this.formData.type),
             status: 0,  // 初始状态：待处理
             openid: uni.getStorageSync('openid')
-          };
+        };
 
-          // 调用后端API
-          uni.request({
+        // 调用后端API
+        uni.request({
             url: '/dev-api/device/customer/service/ticket',
             method: 'POST',
             data: requestData,
             header: {
-              'Content-Type': 'application/json',
-              'Authorization': 'Bearer ' + uni.getStorageSync('token')
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + uni.getStorageSync('token')
             },
             success: (response) => {
-              uni.hideLoading();
-              if (response.data.code === 200) {
-                uni.showToast({
-                  title: '提交成功',
-                  icon: 'success'
-                });
-                // 重置表单
-                this.formData = {
-                  type: '',
-                  name: '',
-                  phone: '',
-                  details: ''
-                };
-                this.isFormComplete = false;
-                this.isConfirmed = false;
-              } else {
-                uni.showToast({
-                  title: response.data.msg || '提交失败',
-                  icon: 'error'
-                });
-              }
+                uni.hideLoading();
+                if (response.data.code === 200) {
+                    uni.showToast({
+                        title: '提交成功',
+                        icon: 'success'
+                    });
+                    // 重置表单
+                    this.formData = {
+                        type: '',
+                        name: '',
+                        phone: '',
+                        details: ''
+                    };
+                    this.isFormComplete = false;
+                    this.isConfirmed = false;
+                } else {
+                    uni.showToast({
+                        title: response.data.msg || '提交失败',
+                        icon: 'error'
+                    });
+                }
             },
             fail: (error) => {
-              this.saveRecentChats(); // 发生异常时保存对话
-              uni.hideLoading();
-              uni.showToast({
-                title: '网络错误，请稍后重试',
-                icon: 'error'
-              });
-              console.error('提交失败：', error);
+                this.saveRecentChats(); // 发生异常时保存对话
+                uni.hideLoading();
+                uni.showToast({
+                    title: '网络错误，请稍后重试',
+                    icon: 'error'
+                });
+                console.error('提交失败：', error);
             }
-          });
-        } catch (error) {
-          this.saveRecentChats(); // 发生异常时保存对话
-          uni.hideLoading();
-          uni.showToast({
-            title: '网络错误，请稍后重试',
-            icon: 'error'
-          });
-          console.error('提交失败：', error);
-        }
+        });
       },
 
       // 保存最近5轮对话记录
       saveRecentChats() {
         try {
-          // 确保所有消息都有正确的类型和时间
-          const chatsToSave = this.chatList.slice(-10).map(chat => ({
-            type: chat.type || 'user',
-            content: chat.content,
-            time: chat.time || this.formatTime(new Date())
-          }));
-          
-          uni.setStorageSync(this.chatHistoryKey, JSON.stringify(chatsToSave));
-          console.log('成功保存对话记录，共', chatsToSave.length, '条消息');
+            // 确保所有消息都有正确的类型和时间
+            const chatsToSave = this.chatList.slice(-10).map(chat => ({
+                type: chat.type || 'user',
+                content: chat.content,
+                time: chat.time || this.formatTime(new Date())
+            }));
+            
+            uni.setStorageSync(this.chatHistoryKey, JSON.stringify(chatsToSave));
+            console.log('成功保存对话记录，共', chatsToSave.length, '条消息');
         } catch (error) {
-          console.error('保存对话记录失败：', error);
+            console.error('保存对话记录失败：', error);
         }
       },
 
       // 恢复最近的对话记录
       async restoreRecentChats() {
         try {
-          const savedChats = uni.getStorageSync(this.chatHistoryKey);
-          if (savedChats) {
-            const chats = JSON.parse(savedChats);
-            if (Array.isArray(chats) && chats.length > 0) {
-              // 确保消息有正确的格式
-              for (const chat of chats) {
-                if (chat.type && chat.content) {
-                  this.chatList.push({
-                    type: chat.type,
-                    content: chat.content,
-                    time: chat.time || this.formatTime(new Date())
-                  });
+            const savedChats = uni.getStorageSync(this.chatHistoryKey);
+            if (savedChats) {
+                const chats = JSON.parse(savedChats);
+                if (Array.isArray(chats) && chats.length > 0) {
+                    // 确保消息有正确的格式
+                    for (const chat of chats) {
+                        if (chat.type && chat.content) {
+                            this.chatList.push({
+                                type: chat.type,
+                                content: chat.content,
+                                time: chat.time || this.formatTime(new Date())
+                            });
+                        }
+                    }
+                    
+                    console.log('成功恢复对话记录，共', chats.length, '条消息');
+                    
+                    // 恢复后滚动到底部
+                    this.$nextTick(() => {
+                        this.scrollToBottom();
+                    });
                 }
-              }
-              
-              console.log('成功恢复对话记录，共', chats.length, '条消息');
-              
-              // 恢复后滚动到底部
-              this.$nextTick(() => {
-                this.scrollToBottom();
-              });
             }
-          }
         } catch (error) {
-          console.error('恢复对话记录失败：', error);
+            console.error('恢复对话记录失败：', error);
+        }
+      },
+
+      // 保存用户联系信息到localStorage
+      saveContactInfo() {
+        try {
+            const contactInfo = {
+                name: this.formData.name,
+                phone: this.formData.phone
+            };
+            uni.setStorageSync(this.contactInfoKey, JSON.stringify(contactInfo));
+        } catch (e) {
+            console.error('保存联系信息失败:', e);
+        }
+      },
+
+      // 从localStorage恢复用户联系信息
+      restoreContactInfo() {
+        try {
+            const contactInfo = uni.getStorageSync(this.contactInfoKey);
+            if (contactInfo) {
+                const parsedInfo = JSON.parse(contactInfo);
+                this.formData.name = parsedInfo.name || '';
+                this.formData.phone = parsedInfo.phone || '';
+            }
+        } catch (e) {
+            console.error('恢复联系信息失败:', e);
         }
       },
 
@@ -846,6 +853,14 @@
         if (this.isPurchaseHistoryExpanded) {
             this.getOrderList();
         }
+      },
+      clearChat() {
+        this.chatList = [];
+        this.saveRecentChats(); // 清空后更新存储
+        uni.showToast({
+          title: '聊天记录已清空',
+          icon: 'success'
+        });
       }
     }
 
@@ -1038,6 +1053,21 @@
     justify-content: center;
     padding: 0; /* 移除内边距 */
     margin: 0; /* 移除外边距 */
+  }
+
+  .clear-btn {
+    padding: 0 30rpx;
+    height: 70rpx;
+    line-height: 70rpx;
+    background-color: #f5f5f5;
+    color: #666;
+    border-radius: 8rpx;
+    margin-left: 20rpx;
+    font-size: 28rpx;
+  }
+
+  .clear-btn:active {
+    background-color: #e0e0e0;
   }
 
   /* 响应式布局适配 */
